@@ -1,105 +1,56 @@
-name: NBA Data Lake CI/CD Pipeline
+name: CI/CD Pipeline for NBA Data Lake
 
 on:
   push:
     branches:
-      - main  # Trigger pipeline on pushes to the main branch
+      - main
   pull_request:
     branches:
-      - main  # Trigger on pull requests to the main branch
+      - main
 
 jobs:
-  setup:
-    runs-on: ubuntu-latest  # Use Ubuntu for the environment
+  build-and-deploy:
+    runs-on: ubuntu-latest
 
     steps:
-    # Step 1: Checkout the code from the repository
-    - name: Checkout repository
-      uses: actions/checkout@v2
+    # Step 1: Checkout the repository
+    - name: Checkout Code
+      uses: actions/checkout@v3
 
     # Step 2: Set up Python environment
-    - name: Set up Python 3.x
-      uses: actions/setup-python@v2
+    - name: Set up Python
+      uses: actions/setup-python@v4
       with:
-        python-version: '3.x'
+        python-version: '3.9'
 
-    # Step 3: Install dependencies from requirements.txt
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+    # Step 3: Install dependencies
+    - name: Install Dependencies
+      run: pip install -r requirements.txt
 
-    # Step 4: Run the Python script to fetch and upload NBA data to S3
-    - name: Run NBA Data Script
+    # Step 4: Run the Data Lake Setup Script
+    - name: Run Setup Script
       run: python setup_nba_datalake.py
 
-    # Step 5: Upload to S3 (if previous step is successful)
-    - name: Upload to S3
-      if: success()  # This step runs only if the previous steps succeed
+    # Step 5: Deploy to S3
+    - name: Deploy to S3
       run: |
-        aws s3 sync . s3://your-bucket-name --delete
+        aws s3 sync . s3://ancrsports-analytic-data-lake --region us-east-2 --delete
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-    # Step 6: Notify on failure
-    - name: Notify if failed
-      if: failure()  # Runs only if any step fails
-      run: |
-        echo "There was an issue with the pipeline. Please check the logs."
-
-    name: NBA Data Lake CI/CD Pipeline
-
-on:
-  push:
-    branches:
-      - main  # Trigger pipeline on pushes to the main branch
-  pull_request:
-    branches:
-      - main  # Trigger on pull requests to the main branch
-
-jobs:
-  setup:
-    runs-on: ubuntu-latest  # Use Ubuntu for the environment
-
-    steps:
-    # Step 1: Checkout the code from the repository
-    - name: Checkout repository
-      uses: actions/checkout@v2
-
-    # Step 2: Set up Python environment
-    - name: Set up Python 3.x
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
-
-    # Step 3: Install dependencies from requirements.txt
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    # Step 4: Run the Python script to fetch and upload NBA data to S3
-    - name: Run NBA Data Script
-      run: python setup_nba_datalake.py
-
-    # Step 5: Upload to S3 (if previous step is successful)
-    - name: Upload to S3
-      if: success()  # This step runs only if the previous steps succeed
-      run: |
-        aws s3 sync . s3://your-bucket-name --delete
-
-    # Step 6: Notify on Slack if the build fails
+    # Step 6: Notify on Slack on Failure
     - name: Notify on Slack on Failure
-      if: failure()  # Runs only if any previous step fails
+      if: failure()
       uses: 8398a7/action-slack@v3
       with:
-        slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}  # Set this in your repository secrets
+        slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
         text: 'Build failed! Please check the logs.'
 
-    # Optional: Notify success (You can also add success notification if needed)
-    # - name: Notify on Slack on Success
-    #   if: success()
-    #   uses: 8398a7/action-slack@v3
-    #   with:
-    #     slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-    #     text: 'Build succeeded!'
-
-
+    # Step 7: Notify on Successful Deployment (Optional)
+    - name: Notify on Slack on Success
+      if: success()
+      uses: 8398a7/action-slack@v3
+      with:
+        slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        text: 'Build and deployment completed successfully! 🎉'
