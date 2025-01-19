@@ -1,0 +1,56 @@
+name: CI/CD Pipeline for NBA Data Lake
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Step 1: Checkout the repository
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # Step 2: Set up Python environment
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    # Step 3: Install dependencies
+    - name: Install Dependencies
+      run: pip install -r requirements.txt
+
+    # Step 4: Run the Data Lake Setup Script
+    - name: Run Setup Script
+      run: python setup_nba_datalake.py
+
+    # Step 5: Deploy to S3
+    - name: Deploy to S3
+      run: |
+        aws s3 sync . s3://ancrsports-analytic-data-lake --region us-east-2 --delete
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    # Step 6: Notify on Slack on Failure
+    - name: Notify on Slack on Failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        text: 'Build failed! Please check the logs.'
+
+    # Step 7: Notify on Successful Deployment (Optional)
+    - name: Notify on Slack on Success
+      if: success()
+      uses: 8398a7/action-slack@v3
+      with:
+        slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        text: 'Build and deployment completed successfully! 🎉'
